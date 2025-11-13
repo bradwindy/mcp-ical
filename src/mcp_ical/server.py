@@ -155,10 +155,15 @@ async def update_event(
 ) -> str:
     """Update an existing calendar event or a specific occurrence of a recurring event.
 
-    CRITICAL: When updating specific occurrences of recurring events, you MUST use the EXACT datetime
-    from list_events. The datetime should be in the format YYYY-MM-DDTHH:MM:SS in your local timezone
-    WITHOUT a timezone offset (e.g., "2025-11-15T09:00:00", not "2025-11-15T09:00:00+11:00").
-    Do NOT construct dates manually - always copy from list_events output and remove any timezone suffix.
+    IMPORTANT: For best results, use the EXACT datetime from list_events when updating specific
+    occurrences. The system now fully supports timezone-aware datetimes in ISO 8601 format
+    (e.g., "2025-11-15T09:00:00+11:00") and will automatically handle timezone conversions.
+
+    Datetime formats supported:
+    - Timezone-aware (preferred): "2025-11-15T09:00:00+11:00" or "2025-11-15T09:00:00-08:00"
+    - Naive (local timezone assumed): "2025-11-15T09:00:00"
+
+    Always copy datetime strings exactly from list_events output for occurrence matching.
 
     Before using this tool, make sure to:
     1. Ask the user which fields they want to update
@@ -200,22 +205,25 @@ async def update_event(
         update_future_events: When True with occurrence_date, updates this occurrence and all future ones.
                              When False (default) with occurrence_date, updates only this specific occurrence.
                              Ignored when occurrence_date is None.
-        occurrence_date: The EXACT start time from list_events output in local timezone format.
+        occurrence_date: The EXACT start time from list_events output.
                         Required when updating a specific occurrence of a recurring event.
-                        Format: YYYY-MM-DDTHH:MM:SS (e.g., "2025-11-23T14:00:00")
-                        IMPORTANT: Remove any timezone suffix like +11:00 - use local time only.
-                        DO NOT construct this manually - copy from list_events and remove timezone suffix.
+                        Supports both timezone-aware and naive datetime formats:
+                        - With timezone (preferred): "2025-11-23T14:00:00+11:00"
+                        - Without timezone: "2025-11-23T14:00:00" (assumes local time)
+                        Always copy exactly from list_events output for best results.
 
     Usage Examples:
         - Update non-recurring event: update_event("event-id-123", {...})
-        - Update just one occurrence (default): update_event("event-id-456", {...}, occurrence_date="2025-11-23T14:00:00")
-        - Update from occurrence forward: update_event("event-id-456", {...}, occurrence_date="2025-11-23T14:00:00", update_future_events=True)
+        - Update just one occurrence: update_event("event-id-456", {...}, occurrence_date="2025-11-23T14:00:00+11:00")
+        - Update from occurrence forward: update_event("event-id-456", {...}, occurrence_date="2025-11-23T14:00:00+11:00", update_future_events=True)
         - Update all occurrences: update_event("event-id-456", {...})
 
     Note:
         Both `end_date` and `occurrence_count` should not be set simultaneously; choose one or the other, or leave both unset.
-        The exact datetime format is CRITICAL for occurrence updates. Always use list_events first and copy the exact
-        datetime string, removing any timezone offset (e.g., remove the "+11:00" suffix).
+
+        Timezone handling: The system automatically converts all datetimes to the user's local timezone
+        when interacting with the calendar. You can provide datetimes in any timezone (UTC, PST, AEDT, etc.)
+        and they will be converted correctly.
 
         When update_future_events=True is used with occurrence_date, it creates a separate recurring series
         from that point forward. Subsequent updates to the master event will not affect this forked series.
@@ -251,10 +259,13 @@ async def delete_event(
 ) -> str:
     """Delete a calendar event or specific occurrence(s) of a recurring event.
 
-    CRITICAL: When deleting specific occurrences, you MUST use the EXACT datetime from list_events.
-    The datetime should be in the format YYYY-MM-DDTHH:MM:SS in your local timezone WITHOUT a
-    timezone offset (e.g., "2025-11-15T09:00:00", not "2025-11-15T09:00:00+11:00").
-    Do NOT construct dates manually - always copy from list_events output and remove any timezone suffix.
+    IMPORTANT: For best results, use the EXACT datetime from list_events when deleting specific
+    occurrences. The system now fully supports timezone-aware datetimes in ISO 8601 format
+    and will automatically handle timezone conversions.
+
+    Datetime formats supported:
+    - Timezone-aware (preferred): "2025-11-15T09:00:00+11:00" or "2025-11-15T09:00:00-08:00"
+    - Naive (local timezone assumed): "2025-11-15T09:00:00"
 
     Before using this tool, make sure to:
     1. Confirm with the user that they want to delete this event
@@ -265,30 +276,32 @@ async def delete_event(
             - Delete the entire series: set delete_entire_series=True (no occurrence_date)
         - Ask which occurrence(s) they want to delete if that isn't very clear
         - Use list_events first to get exact datetimes if you don't have them
-        - Use the EXACT datetime from list_events (remove any timezone suffix)
+        - Copy the EXACT datetime from list_events output
 
     Args:
         event_id: Unique identifier of the event (master event ID for recurring events)
         delete_entire_series: When True with occurrence_date, deletes that occurrence and all future ones.
                              When True without occurrence_date, deletes all occurrences.
                              When False (default), deletes only the specific occurrence.
-        occurrence_date: The EXACT start time from list_events output in local timezone format.
+        occurrence_date: The EXACT start time from list_events output.
                         REQUIRED when deleting a specific occurrence.
-                        Format: YYYY-MM-DDTHH:MM:SS (e.g., "2025-11-23T14:00:00")
-                        IMPORTANT: Remove any timezone suffix like +11:00 - use local time only.
-                        DO NOT construct this manually - copy from list_events and remove timezone suffix.
+                        Supports both timezone-aware and naive datetime formats:
+                        - With timezone (preferred): "2025-11-23T14:00:00+11:00"
+                        - Without timezone: "2025-11-23T14:00:00" (assumes local time)
+                        Always copy exactly from list_events output for best results.
 
     Usage Examples:
         - Delete non-recurring event: delete_event("event-id-123")
         - Delete one occurrence:
           1. First: list_events to get exact datetime
-          2. Then: delete_event("event-id-456", occurrence_date="2025-11-23T14:00:00")
-        - Delete from occurrence forward: delete_event("event-id-456", occurrence_date="2025-11-23T14:00:00", delete_entire_series=True)
+          2. Then: delete_event("event-id-456", occurrence_date="2025-11-23T14:00:00+11:00")
+        - Delete from occurrence forward: delete_event("event-id-456", occurrence_date="2025-11-23T14:00:00+11:00", delete_entire_series=True)
         - Delete all occurrences: delete_event("event-id-456", delete_entire_series=True)
 
     Note:
-        The exact datetime format is CRITICAL. Always use list_events first and copy the exact
-        datetime string, removing any timezone offset (e.g., remove the "+11:00" suffix).
+        Timezone handling: The system automatically converts all datetimes to the user's local timezone
+        when interacting with the calendar. You can provide datetimes in any timezone (UTC, PST, AEDT, etc.)
+        and they will be converted correctly.
     """
     logger.info(
         f"Attempting to delete event with ID: {event_id}, "
