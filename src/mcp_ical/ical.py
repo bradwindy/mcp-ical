@@ -28,6 +28,42 @@ logger.add(
 )
 
 
+def to_eventkit_datetime(dt: datetime) -> datetime:
+    """Convert a datetime to naive local time for EventKit.
+
+    EventKit expects naive datetime objects in local timezone. This function:
+    1. Converts timezone-aware datetimes to local timezone, then strips tzinfo
+    2. Passes through naive datetimes as-is (assumes they're already local)
+
+    Args:
+        dt: datetime object (aware or naive)
+
+    Returns:
+        datetime: Naive datetime in local timezone suitable for EventKit
+
+    Examples:
+        >>> # Timezone-aware UTC time
+        >>> utc_dt = datetime(2025, 11, 14, 3, 0, tzinfo=timezone.utc)
+        >>> to_eventkit_datetime(utc_dt)
+        datetime(2025, 11, 14, 14, 0)  # AEDT is UTC+11
+
+        >>> # Timezone-aware PST time
+        >>> pst_dt = datetime(2025, 11, 14, 10, 0, tzinfo=ZoneInfo('America/Los_Angeles'))
+        >>> to_eventkit_datetime(pst_dt)
+        datetime(2025, 11, 15, 5, 0)  # Converted to AEDT
+
+        >>> # Naive datetime (assumed local)
+        >>> naive_dt = datetime(2025, 11, 14, 14, 0)
+        >>> to_eventkit_datetime(naive_dt)
+        datetime(2025, 11, 14, 14, 0)  # Passed through
+    """
+    if dt.tzinfo is not None:
+        # Timezone-aware: convert to local timezone and strip tzinfo
+        return dt.astimezone().replace(tzinfo=None)
+    # Naive: pass through as-is (assume it's already local time)
+    return dt
+
+
 class CalendarManager:
     def __init__(self):
         self.event_store = EKEventStore.alloc().init()
@@ -71,7 +107,12 @@ class CalendarManager:
             f"Listing events between {start_time} - {end_time}, searching in: {calendar_name if calendar_name else 'all calendars'}"
         )
 
-        predicate = self.event_store.predicateForEventsWithStartDate_endDate_calendars_(start_time, end_time, calendars)
+        # Convert timezone-aware datetimes to naive local time for EventKit
+        # This allows Claude to provide times in any timezone and we'll convert correctly
+        start_naive = to_eventkit_datetime(start_time)
+        end_naive = to_eventkit_datetime(end_time)
+
+        predicate = self.event_store.predicateForEventsWithStartDate_endDate_calendars_(start_naive, end_naive, calendars)
 
         events = self.event_store.eventsMatchingPredicate_(predicate)
         return [Event.from_ekevent(event) for event in events]
@@ -88,8 +129,9 @@ class CalendarManager:
         ekevent = EKEvent.eventWithEventStore_(self.event_store)
 
         ekevent.setTitle_(new_event.title)
-        ekevent.setStartDate_(new_event.start_time)
-        ekevent.setEndDate_(new_event.end_time)
+        # Convert timezone-aware datetimes to naive local time for EventKit
+        ekevent.setStartDate_(to_eventkit_datetime(new_event.start_time))
+        ekevent.setEndDate_(to_eventkit_datetime(new_event.end_time))
 
         if new_event.notes:
             ekevent.setNotes_(new_event.notes)
@@ -182,9 +224,11 @@ class CalendarManager:
         if request.title is not None:
             existing_ek_event.setTitle_(request.title)
         if request.start_time is not None:
-            existing_ek_event.setStartDate_(request.start_time)
+            # Convert timezone-aware datetime to naive local time for EventKit
+            existing_ek_event.setStartDate_(to_eventkit_datetime(request.start_time))
         if request.end_time is not None:
-            existing_ek_event.setEndDate_(request.end_time)
+            # Convert timezone-aware datetime to naive local time for EventKit
+            existing_ek_event.setEndDate_(to_eventkit_datetime(request.end_time))
         if request.location is not None:
             existing_ek_event.setLocation_(request.location)
         if request.notes is not None:
