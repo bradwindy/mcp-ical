@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -72,8 +72,9 @@ def cleanup_events(calendar_manager):
 
 @pytest.fixture
 def test_event_base():
-    """Base event data for testing"""
-    start_time = datetime.now().replace(microsecond=0) + timedelta(days=1)
+    """Base event data for testing - uses timezone-aware datetimes"""
+    # Create timezone-aware datetime in local timezone
+    start_time = datetime.now(timezone.utc).astimezone().replace(microsecond=0) + timedelta(days=1)
     end_time = start_time + timedelta(hours=1)
     return {
         "title": "Test Event",
