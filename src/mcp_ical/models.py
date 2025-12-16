@@ -175,11 +175,22 @@ class Event:
                 else None,
             )
 
+        # Handle all-day event dates specially
+        # All-day events should display as local dates normalized to midnight/end-of-day
+        if ekevent.isAllDay():
+            start_local = convert_datetime(ekevent.startDate())
+            end_local = convert_datetime(ekevent.endDate())
+            # Normalize to midnight/end-of-day while preserving timezone
+            start_time = start_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_time = end_local.replace(hour=23, minute=59, second=59, microsecond=0)
+        else:
+            start_time = convert_datetime(ekevent.startDate())
+            end_time = convert_datetime(ekevent.endDate())
+
         return cls(
             title=ekevent.title(),
-            # Convert all datetime fields to timezone-aware
-            start_time=convert_datetime(ekevent.startDate()),
-            end_time=convert_datetime(ekevent.endDate()),
+            start_time=start_time,
+            end_time=end_time,
             calendar_name=ekevent.calendar().title(),
             location=ekevent.location(),
             notes=ekevent.notes(),
